@@ -17,5 +17,5 @@ export type Item={productId:string;name:string;quantity:number;unitPriceMinor:nu
 export type Contact={firstName:string;lastName:string;email?:string;phone?:string|null};
 export type VendorOrder={subtotalMinor:number;discountMinor:number;deliveryMinor:number;commissionMinor:number;payableMinor:number;orderId:string;rider?:Contact|null;failureReason?:string|null;deliveredAt?:string|null;id:string;status:string;vendorId:string;totalMinor:number;items:Item[];createdAt:string;events:{status:string;createdAt:string;note?:string}[];cashReceived?:boolean;order?:{customer?:Contact;payment?:{status:string}|null;paymentMethod:string;address:Address;deliveryWindow?:{startsAt:string;endsAt:string}|null};latitude?:number;longitude?:number};
 export type Order={id:string;totalMinor:number;createdAt:string;vendorOrders:VendorOrder[]};
-export type Notice={id:string;title:string;body:string;readAt:string|null};
+export type Notice={createdAt:string;id:string;title:string;body:string;readAt:string|null};
 export const money=(v:number)=>new Intl.NumberFormat('en-PK',{style:'currency',currency:'PKR'}).format(v/100);
