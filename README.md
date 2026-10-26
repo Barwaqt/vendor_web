@@ -20,3 +20,7 @@ Checks: `npm run lint`, `npm run build`.
 Pushes to `main` automatically validate and deploy to `/var/www/app.barwaqt.com`, using PM2 (`barwaqt-vendor`) on port 3001. Follow [Ubuntu, Nginx, HTTPS and GitHub setup](DEPLOYMENT.md) for the first deployment.
 
 Products shows Pending review, Approved and Rejected states. New listings remain unpublished until admin approval; rejected products display the reason. Edit and save to resubmit. Changes to listing content or price require another review; stock-only updates do not. Enable/disable controls cannot bypass review. Deploy the backend product-moderation migration before this UI.
+
+## Session and support updates
+
+Support displays administrator-managed phone, second phone, email and WhatsApp contacts. Settings offers password change without social-provider linking. Session refresh is coordinated across auth and commerce routes; temporary service failures offer retry instead of logging out.
