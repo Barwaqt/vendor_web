@@ -10,7 +10,8 @@ test('vendor returns requests reach backend; unsupported routes stay blocked',as
  exports,process:{env:{}},URL,AbortSignal,setTimeout,require(name){
  if(name==='next/server')return {NextResponse:{json:(body,options)=>({body,...options})}};
  if(name==='next/headers')return {cookies:async()=>({get:()=>({value:'test-access-token'})})};
- throw Error(name);
+ if (name === '../../../lib/session-refresh') return { refreshSession() { throw Error('Unexpected session refresh in this test'); } };
+        throw Error(name);
  },fetch:async(url)=>{calls.push(url);return {status:200,text:async()=>JSON.stringify({data:{items:[],total:0}})}}});
  const req={method:'GET',headers:new Headers(),url:'http://localhost:3001/api/commerce/returns',nextUrl:{search:'?page=1'}};
  const response=await exports.GET(req,{params:Promise.resolve({path:['returns']})});
