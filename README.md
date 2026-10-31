@@ -24,3 +24,7 @@ Products shows Pending review, Approved and Rejected states. New listings remain
 ## Session and support updates
 
 Support displays administrator-managed phone, second phone, email and WhatsApp contacts. Settings offers password change without social-provider linking. Session refresh is coordinated across auth and commerce routes; temporary service failures offer retry instead of logging out.
+
+### SMS login
+
+Administrator-registered vendors can enter their phone number and sign in with a six-digit SMS code. Email/password login remains available; public vendor signup remains disabled. The API must have the phone OTP migration and real Veevo SMS credentials configured. The vendor frontend stores successful verification tokens in HttpOnly cookies and rejects non-vendor accounts. No Veevo keys belong in frontend environment variables.
