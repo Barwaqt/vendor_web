@@ -18,9 +18,13 @@ function harness(data){
 test('public phone signup remains unavailable on the vendor portal',async()=>{
  const h=harness({});assert.equal((await h.post('phone-signup',{})).status,404);assert.equal(h.calls.length,0);
 });
-test('phone login pins vendor portal and does not save a session before verification',async()=>{
- const h=harness({challengeId:'challenge'});assert.equal((await h.post('phone-login',{phone:'+923001234567',portal:'customer'})).status,200);
- assert.equal(JSON.parse(h.calls[0].body).portal,'vendor');assert.equal(h.cookies.length,0);
+test('phone login pins vendor portal and saves vendor session cookies',async()=>{
+ const h=harness({user:{id:'vendor-user',role:'VENDOR'},accessToken:'access',refreshToken:'refresh',expiresIn:900});
+ const res=await h.post('phone-login',{phone:'+923001234567',password:'VendorPass1234',portal:'customer'});
+ assert.equal(res.status,200);
+ assert.equal(JSON.parse(h.calls[0].body).portal,'vendor');
+ assert.equal(h.cookies.length,2);
+ assert.ok(h.cookies.every(c=>c[2].httpOnly));
 });
 test('phone verification sets vendor session cookies and rejects customer accounts',async()=>{
  for(const role of ['VENDOR','CUSTOMER']){
