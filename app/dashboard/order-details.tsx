@@ -16,7 +16,7 @@ export function OrderDetails({order}:{order:VendorOrder}){
  const [selectedProduct,setSelectedProduct]=useState<string|null>(null);
  const a=order.order?.address;
  const hasPin=typeof a?.latitude==='number'&&typeof a?.longitude==='number';
- const destination=hasPin?`${a!.latitude},${a!.longitude}`:[a?.apartment,a?.building,a?.street,a?.zone,a?.city,'Pakistan'].filter(Boolean).join(', ');
+ const destination=hasPin?`${a!.latitude},${a!.longitude}`:[a?.street,a?.building,a?.apartment,a?.zone,a?.city,'Pakistan'].filter(Boolean).join(', ');
  return <>
  <p className="muted">Checkout reference: {order.orderId}</p>
  <h3>Customer account</h3><ContactInfo person={order.order?.customer}/>
@@ -28,6 +28,7 @@ export function OrderDetails({order}:{order:VendorOrder}){
  <dl>{[['Items subtotal',order.subtotalMinor],['Discount',order.discountMinor],['Delivery fee',order.deliveryMinor],['Order total',order.totalMinor],['Platform commission',order.commissionMinor],['Vendor payable',order.payableMinor]].map(([label,value])=><div key={label}><dt>{label}</dt><dd>{money(Number(value))}</dd></div>)}</dl>
  <h3>Delivery</h3>{order.order?.deliveryWindow?<p>Scheduled: {new Date(order.order.deliveryWindow.startsAt).toLocaleString()} – {new Date(order.order.deliveryWindow.endsAt).toLocaleString()}</p>:<p>Vendor delivery · no scheduled window</p>}
  <p>Assigned rider:</p>{order.rider?<ContactInfo person={order.rider}/>:<p>Not assigned yet</p>}
+ {typeof order.latitude==='number'&&typeof order.longitude==='number'&&<p>Rider live location: <a href={`https://www.google.com/maps?q=${order.latitude},${order.longitude}`} target="_blank" rel="noreferrer">View on Maps ↗</a> <span className="muted">({order.latitude.toFixed(5)}, {order.longitude.toFixed(5)})</span></p>}
  {order.deliveredAt&&<p>Delivered: {new Date(order.deliveredAt).toLocaleString()}</p>}{order.failureReason&&<p>Delivery issue: {order.failureReason}</p>}
  <h3>Order status & history</h3>
  {selectedProduct&&<ProductDetails productId={selectedProduct} onClose={()=>setSelectedProduct(null)}/>}
