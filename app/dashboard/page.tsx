@@ -13,7 +13,7 @@ import {useVendorUser} from '../components/vendor-session';
 import {api,useApi,type VendorOrder} from '../components/commerce-client';
 import {Products,Finance,Notifications,BusinessForm,Settings,Categories,Overview} from './panels';
 import {Returns} from './panels';
-type Business={id:string;name:string;description:string;address:string;city:string;zone:string;status:string;commissionBps:number};
+type Business={id:string;name:string;description:string;address:string;city:string;zone:string;status:string;commissionBps:number;expressDelivery?:boolean;expressEtaMinutes?:number|null;standardDeliveryDays?:number};
 type Summary={products:number;orders:{status:string;_count:number}[];delivered:{_sum:{subtotalMinor:number|null;commissionMinor:number|null;payableMinor:number|null}};productStatus:{active:number;inactive:number;outOfStock:number};sales:{date:string;totalMinor:number}[];topProducts:{id:string;name:string;image:string;sold:number;totalMinor:number}[];pendingPayableMinor:number};
 const nav=[['Dashboard','grid'],['Orders','orders'],['Products','box'],['Returns','orders'],['Categories','grid'],['Business','box'],['Finance','wallet'],['Reports','chart'],['Notifications','bell'],['Support','help'],['Settings','settings']];
 const money=(n:number)=>new Intl.NumberFormat('en-PK').format(n);
