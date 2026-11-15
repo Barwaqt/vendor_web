@@ -52,12 +52,26 @@ function ProductVariantsField({value,onChange}:{value:VariantDraft[];onChange:(n
   const hasVariants = variantsMode || value.length > 0;
   const [activeTab, setActiveTab] = useState<'apparel'|'electronics'|'grocery'|'custom'>('apparel');
   const [sizeCategory, setSizeCategory] = useState<string>('Adult Apparel (Shirts, Tops, Dresses)');
-  const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
+  // Seed the pickers from a saved product so reopening the editor shows the
+  // existing choices instead of a blank slate.
+  const savedValues = (key: string) =>
+    Array.from(new Set(value.map(v => v.options?.[key]).filter((item): item is string => Boolean(item))));
+  const savedCustomKeys = Array.from(new Set(value.reduce<string[]>((keys, v) => keys.concat(Object.keys(v.options || {})), [])))
+    .filter(key => key !== 'Color' && key !== 'Size');
+  const [selectedSizes, setSelectedSizes] = useState<string[]>(() => savedValues('Size'));
   const [customSize, setCustomSize] = useState('');
-  const [selectedColors, setSelectedColors] = useState<{name:string;image?:string}[]>([]);
+  const [selectedColors, setSelectedColors] = useState<{name:string;image?:string}[]>(() => {
+    const colors = new Map<string, {name:string;image?:string}>();
+    for (const variant of value) {
+      const name = variant.options?.Color;
+      if (!name) continue;
+      colors.set(name, { name, image: colors.get(name)?.image || variant.image });
+    }
+    return [...colors.values()];
+  });
   const [customColor, setCustomColor] = useState('');
-  const [customOpt1Name, setCustomOpt1Name] = useState('Storage');
-  const [customOpt1Values, setCustomOpt1Values] = useState<string[]>([]);
+  const [customOpt1Name, setCustomOpt1Name] = useState(() => savedCustomKeys[0] || 'Storage');
+  const [customOpt1Values, setCustomOpt1Values] = useState<string[]>(() => savedValues(savedCustomKeys[0] || ''));
   const [customOpt1Input, setCustomOpt1Input] = useState('');
   const [bulkPrice, setBulkPrice] = useState('');
   const [bulkStock, setBulkStock] = useState('');
@@ -204,8 +218,13 @@ function ProductVariantsField({value,onChange}:{value:VariantDraft[];onChange:(n
       }
     }
 
+    // Generating adds the newly picked combinations and refreshes matching
+    // rows; rows the vendor already saved are kept until they remove them.
+    const generatedNames = new Set(next.map(v => v.name));
+    const generatedIds = new Set(next.map(v => v.id).filter(Boolean));
+    const retained = value.filter(v => !generatedNames.has(v.name) && !(v.id && generatedIds.has(v.id)));
     if (next.length) {
-      onChange(next);
+      onChange([...next, ...retained]);
     }
   }
 
