@@ -16,11 +16,461 @@ type VendorProfile={categoryIds?:string[]|null};
 type Summary={products:number;orders:{status:string;_count:number}[];delivered:{_sum:{subtotalMinor:number|null;commissionMinor:number|null;payableMinor:number|null}};recent:{id:string;status:string;totalMinor:number}[]};
 function State({loading,error,retry}:{loading:boolean;error:string;retry:()=>void}){return loading?<BrandLoader label="Loading…"/>:error?<ErrorState variant="panel" message={error} onRetry={retry}/>:null;}
 export function Overview(){const q=useApi<Summary>('/vendor/dashboard');return <section className="panel finance-page"><h2>Sales report · all time</h2><State {...q} retry={q.reload}/>{q.data&&<><div className="settlement"><article><h3>Products</h3><b>{q.data.products}</b></article><article><h3>Delivered gross sales</h3><b>{money(q.data.delivered._sum.subtotalMinor||0)}</b></article><article><h3>Commission</h3><b>{money(q.data.delivered._sum.commissionMinor||0)}</b></article><article><h3>Delivered vendor payable</h3><b>{money(q.data.delivered._sum.payableMinor||0)}</b><p>Includes settled orders; see Finance for settlements.</p></article></div><h3>Orders by status</h3>{q.data.orders.map(o=><p key={o.status}>{o.status}: {o._count}</p>)}<h3>Recent orders</h3>{q.data.recent.map(o=><p key={o.id}>{o.id} · {o.status} · {money(o.totalMinor)}</p>)}{!q.data.recent.length&&<p>No orders yet.</p>}</>}</section>;}
-type VariantDraft={id?:string;name:string;price:string;stock:string};
+type VariantDraft={id?:string;name:string;price:string;stock:string;image?:string;options?:Record<string,string>};
 const emptyProduct={name:'',slug:'',categoryId:'',description:'',price:'',stock:'0',images:'',attributes:'{}',variants:[] as VariantDraft[],expressDelivery:false,expressEtaMinutes:120,standardDeliveryDays:7,active:true};
 const expressWindows:[number,string][]=[[30,'30 minutes'],[60,'1 hour'],[120,'2 hours'],[180,'3 hours'],[240,'4 hours'],[480,'8 hours'],[720,'12 hours'],[1440,'24 hours']];
+
+const SIZE_PRESETS: Record<string, string[]> = {
+  'Adult Apparel (Shirts, Tops, Dresses)': ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'],
+  'Baby & Kids (0-5 Years)': ['0-3 Months', '3-6 Months', '6-12 Months', '1-2 Years', '2-3 Years', '3-4 Years', '4-5 Years'],
+  'Pants & Waist (Inches)': ['28', '30', '32', '34', '36', '38', '40', '42'],
+  'Footwear (EU Sizes)': ['36', '37', '38', '39', '40', '41', '42', '43', '44', '45'],
+  'One Size / Free Size': ['Free Size', 'One Size'],
+};
+
+const COMMON_COLORS = [
+  'Black', 'White', 'Navy Blue', 'Royal Blue', 'Sky Blue', 'Red', 'Maroon',
+  'Grey', 'Green', 'Olive', 'Pink', 'Beige', 'Brown', 'Yellow'
+];
+
+const ELECTRONICS_PRESETS: Record<string, string[]> = {
+  'Storage': ['64GB', '128GB', '256GB', '512GB', '1TB'],
+  'RAM': ['4GB', '8GB', '16GB', '32GB'],
+};
+
+const GROCERY_PRESETS: Record<string, string[]> = {
+  'Weight / Volume': ['250g', '500g', '1kg', '2kg', '5kg', '250ml', '500ml', '1 Litre'],
+  'Pack Size': ['Single Piece', 'Pack of 2', 'Pack of 3', 'Pack of 6', 'Pack of 12'],
+};
+
 function ProductDeliveryFields({value,onChange}:{value:{expressDelivery:boolean;expressEtaMinutes:number;standardDeliveryDays:number};onChange:(next:{expressDelivery:boolean;expressEtaMinutes:number;standardDeliveryDays:number})=>void}){return <fieldset><legend>Delivery options</legend><div className="form-grid"><label>Standard delivery<select value={value.standardDeliveryDays} onChange={e=>onChange({...value,standardDeliveryDays:Number(e.target.value)})}>{[1,2,3,4,5,6,7].map(days=><option key={days} value={days}>Within {days} day{days===1?'':'s'}</option>)}</select></label><label>Express delivery<select value={value.expressDelivery?'on':'off'} onChange={e=>onChange({...value,expressDelivery:e.target.value==='on'})}><option value="off">Not offered</option><option value="on">Offered</option></select></label>{value.expressDelivery&&<label>Express delivery time<select value={value.expressEtaMinutes} onChange={e=>onChange({...value,expressEtaMinutes:Number(e.target.value)})}>{expressWindows.map(([minutes,label])=><option key={minutes} value={minutes}>Within {label}</option>)}</select></label>}</div><p className="muted" style={{marginTop:6}}>Customers pick one option at checkout for this product. Express is only offered when every product in the basket supports it.</p></fieldset>}
-function ProductVariantsField({value,onChange}:{value:VariantDraft[];onChange:(next:VariantDraft[])=>void}){function update(index:number,patch:Partial<VariantDraft>){onChange(value.map((variant,i)=>i===index?{...variant,...patch}:variant));}return <fieldset><legend>Variants (size, model, colour…)</legend><p className="muted" style={{marginTop:0}}>Add a row for each version you sell. Every variant has its own price and stock, and customers must choose one before adding the product to the cart. The price and stock fields above apply only when there are no variants.</p>{value.map((variant,index)=><div className="form-grid" key={variant.id||index} style={{alignItems:'end',borderTop:index?'1px solid #eef2f6':undefined,paddingTop:index?12:0}}><label>Variant name<input required maxLength={120} placeholder="Size: Medium / Model: X" value={variant.name} onChange={e=>update(index,{name:e.target.value})}/></label><label>Price (PKR)<input required type="number" min="0.01" step="0.01" value={variant.price} onChange={e=>update(index,{price:e.target.value})}/></label><label>Stock<input required type="number" min="0" step="1" value={variant.stock} onChange={e=>update(index,{stock:e.target.value})}/></label><button type="button" onClick={()=>onChange(value.filter((_,i)=>i!==index))}>Remove</button></div>)}<button type="button" onClick={()=>onChange([...value,{name:'',price:'',stock:'0'}])}>+ Add variant</button></fieldset>}
+
+function ProductVariantsField({value,onChange}:{value:VariantDraft[];onChange:(next:VariantDraft[])=>void}){
+  const [hasVariants, setHasVariants] = useState(value.length > 0);
+  const [activeTab, setActiveTab] = useState<'apparel'|'electronics'|'grocery'|'custom'>('apparel');
+  const [sizeCategory, setSizeCategory] = useState<string>('Adult Apparel (Shirts, Tops, Dresses)');
+  const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
+  const [customSize, setCustomSize] = useState('');
+  const [selectedColors, setSelectedColors] = useState<{name:string;image?:string}[]>([]);
+  const [customColor, setCustomColor] = useState('');
+  const [customOpt1Name, setCustomOpt1Name] = useState('Storage');
+  const [customOpt1Values, setCustomOpt1Values] = useState<string[]>([]);
+  const [customOpt1Input, setCustomOpt1Input] = useState('');
+  const [bulkPrice, setBulkPrice] = useState('');
+  const [bulkStock, setBulkStock] = useState('');
+
+  // Keep hasVariants in sync if external value loads with variants
+  useEffect(() => {
+    if (value.length > 0 && !hasVariants) setHasVariants(true);
+  }, [value.length]);
+
+  function updateRow(index:number, patch:Partial<VariantDraft>){
+    onChange(value.map((v, i) => i === index ? { ...v, ...patch } : v));
+  }
+
+  function toggleSize(sz: string) {
+    setSelectedSizes(prev => prev.includes(sz) ? prev.filter(s => s !== sz) : [...prev, sz]);
+  }
+
+  function addCustomSize() {
+    const trimmed = customSize.trim();
+    if (!trimmed) return;
+    if (!selectedSizes.includes(trimmed)) setSelectedSizes(prev => [...prev, trimmed]);
+    setCustomSize('');
+  }
+
+  function toggleColor(col: string) {
+    setSelectedColors(prev => prev.some(c => c.name === col) ? prev.filter(c => c.name !== col) : [...prev, { name: col }]);
+  }
+
+  function addCustomColor() {
+    const trimmed = customColor.trim();
+    if (!trimmed) return;
+    if (!selectedColors.some(c => c.name === trimmed)) setSelectedColors(prev => [...prev, { name: trimmed }]);
+    setCustomColor('');
+  }
+
+  function updateColorImage(colName: string, image: string) {
+    setSelectedColors(prev => prev.map(c => c.name === colName ? { ...c, image } : c));
+    // Also update any existing rows with this color
+    onChange(value.map(v => {
+      if (v.options?.Color === colName || v.name.includes(`Color: ${colName}`)) {
+        return { ...v, image };
+      }
+      return v;
+    }));
+  }
+
+  function toggleCustomOpt(val: string) {
+    setCustomOpt1Values(prev => prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]);
+  }
+
+  function addCustomOptVal() {
+    const trimmed = customOpt1Input.trim();
+    if (!trimmed) return;
+    if (!customOpt1Values.includes(trimmed)) setCustomOpt1Values(prev => [...prev, trimmed]);
+    setCustomOpt1Input('');
+  }
+
+  function generateCombinations() {
+    const existingMap = new Map(value.map(v => [v.name, v]));
+    const next: VariantDraft[] = [];
+
+    if (activeTab === 'apparel') {
+      if (selectedColors.length && selectedSizes.length) {
+        for (const col of selectedColors) {
+          for (const sz of selectedSizes) {
+            const name = `Color: ${col.name} / Size: ${sz}`;
+            const existing = existingMap.get(name);
+            next.push({
+              ...(existing?.id ? { id: existing.id } : {}),
+              name,
+              price: existing?.price || bulkPrice || '',
+              stock: existing?.stock || bulkStock || '0',
+              image: existing?.image || col.image || '',
+              options: { Color: col.name, Size: sz }
+            });
+          }
+        }
+      } else if (selectedSizes.length) {
+        for (const sz of selectedSizes) {
+          const name = `Size: ${sz}`;
+          const existing = existingMap.get(name);
+          next.push({
+            ...(existing?.id ? { id: existing.id } : {}),
+            name,
+            price: existing?.price || bulkPrice || '',
+            stock: existing?.stock || bulkStock || '0',
+            image: existing?.image || '',
+            options: { Size: sz }
+          });
+        }
+      } else if (selectedColors.length) {
+        for (const col of selectedColors) {
+          const name = `Color: ${col.name}`;
+          const existing = existingMap.get(name);
+          next.push({
+            ...(existing?.id ? { id: existing.id } : {}),
+            name,
+            price: existing?.price || bulkPrice || '',
+            stock: existing?.stock || bulkStock || '0',
+            image: existing?.image || col.image || '',
+            options: { Color: col.name }
+          });
+        }
+      }
+    } else if (activeTab === 'electronics') {
+      if (customOpt1Values.length && selectedColors.length) {
+        for (const col of selectedColors) {
+          for (const opt of customOpt1Values) {
+            const name = `Color: ${col.name} / ${customOpt1Name}: ${opt}`;
+            const existing = existingMap.get(name);
+            next.push({
+              ...(existing?.id ? { id: existing.id } : {}),
+              name,
+              price: existing?.price || bulkPrice || '',
+              stock: existing?.stock || bulkStock || '0',
+              image: existing?.image || col.image || '',
+              options: { Color: col.name, [customOpt1Name]: opt }
+            });
+          }
+        }
+      } else if (customOpt1Values.length) {
+        for (const opt of customOpt1Values) {
+          const name = `${customOpt1Name}: ${opt}`;
+          const existing = existingMap.get(name);
+          next.push({
+            ...(existing?.id ? { id: existing.id } : {}),
+            name,
+            price: existing?.price || bulkPrice || '',
+            stock: existing?.stock || bulkStock || '0',
+            image: existing?.image || '',
+            options: { [customOpt1Name]: opt }
+          });
+        }
+      }
+    } else {
+      if (customOpt1Values.length) {
+        for (const opt of customOpt1Values) {
+          const name = `${customOpt1Name}: ${opt}`;
+          const existing = existingMap.get(name);
+          next.push({
+            ...(existing?.id ? { id: existing.id } : {}),
+            name,
+            price: existing?.price || bulkPrice || '',
+            stock: existing?.stock || bulkStock || '0',
+            image: existing?.image || '',
+            options: { [customOpt1Name]: opt }
+          });
+        }
+      }
+    }
+
+    if (next.length) {
+      onChange(next);
+    }
+  }
+
+  function applyBulk(type: 'price' | 'stock') {
+    if (type === 'price' && bulkPrice) {
+      onChange(value.map(v => ({ ...v, price: bulkPrice })));
+    }
+    if (type === 'stock' && bulkStock) {
+      onChange(value.map(v => ({ ...v, stock: bulkStock })));
+    }
+  }
+
+  return (
+    <fieldset className="variant-builder">
+      <legend><b>Product variations & options</b></legend>
+      <div className="variant-mode-selector">
+        <label>
+          <input type="radio" name="prod-variation-mode" checked={!hasVariants} onChange={() => { setHasVariants(false); onChange([]); }} />
+          <span><b>Simple product</b> (Single price & stock, no variations like books or standard appliances)</span>
+        </label>
+        <label>
+          <input type="radio" name="prod-variation-mode" checked={hasVariants} onChange={() => setHasVariants(true)} />
+          <span><b>Product with variations</b> (Sizes, Colors, Models, Storage)</span>
+        </label>
+      </div>
+
+      {!hasVariants ? (
+        <p className="muted" style={{ margin: '8px 0 0' }}>
+          This product has a single standard price and stock. Enter the price and stock fields above.
+        </p>
+      ) : (
+        <div>
+          <p className="muted" style={{ margin: '0 0 12px' }}>
+            Choose variations below (like Daraz/Amazon). Select predefined sizes and colors, attach photos to colors, and set prices. The product listing price will automatically start from your lowest variant price.
+          </p>
+
+          <div className="variant-preset-tabs" role="tablist">
+            <button type="button" className={`variant-preset-btn ${activeTab === 'apparel' ? 'active' : ''}`} onClick={() => setActiveTab('apparel')}>👕 Apparel (Clothing, Shirts, Dresses)</button>
+            <button type="button" className={`variant-preset-btn ${activeTab === 'electronics' ? 'active' : ''}`} onClick={() => { setActiveTab('electronics'); setCustomOpt1Name('Storage'); }}>📱 Electronics (Storage, RAM, Color)</button>
+            <button type="button" className={`variant-preset-btn ${activeTab === 'grocery' ? 'active' : ''}`} onClick={() => { setActiveTab('grocery'); setCustomOpt1Name('Weight / Pack'); }}>🥫 Groceries & Pack Sizes</button>
+            <button type="button" className={`variant-preset-btn ${activeTab === 'custom' ? 'active' : ''}`} onClick={() => { setActiveTab('custom'); setCustomOpt1Name('Option'); }}>⚙ Custom Variation</button>
+          </div>
+
+          {activeTab === 'apparel' && (
+            <div style={{ background: '#fff', border: '1px solid #dce4dd', borderRadius: 8, padding: 14, marginBottom: 14 }}>
+              <div style={{ marginBottom: 14 }}>
+                <b style={{ display: 'block', fontSize: 13, marginBottom: 6 }}>1. Select Size Category</b>
+                <select value={sizeCategory} onChange={e => setSizeCategory(e.target.value)} style={{ maxWidth: 380 }}>
+                  {Object.keys(SIZE_PRESETS).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                </select>
+
+                <div style={{ marginTop: 10 }}>
+                  <span style={{ fontSize: 12, color: '#55655b', fontWeight: 600 }}>Click sizes to add:</span>
+                  <div className="variant-chip-group">
+                    {SIZE_PRESETS[sizeCategory]?.map(sz => (
+                      <button type="button" key={sz} className={`variant-chip ${selectedSizes.includes(sz) ? 'selected' : ''}`} onClick={() => toggleSize(sz)}>
+                        {selectedSizes.includes(sz) ? '✓ ' : '+ '}{sz}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="variant-custom-input">
+                  <input placeholder="Add custom size (e.g. 0 to 5 months, 5-6 Years, Tailored)" value={customSize} onChange={e => setCustomSize(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomSize(); } }} />
+                  <button type="button" onClick={addCustomSize}>+ Add Size</button>
+                </div>
+
+                {selectedSizes.length > 0 && (
+                  <div style={{ marginTop: 8, fontSize: 12 }}>
+                    <b>Selected sizes ({selectedSizes.length}):</b> {selectedSizes.map(sz => (
+                      <span key={sz} className="pill" style={{ margin: '2px 4px', background: '#dcf1dc', color: '#1a5c28' }}>
+                        {sz} <button type="button" className="variant-chip-remove" onClick={() => toggleSize(sz)}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ borderTop: '1px solid #edf2ee', paddingTop: 14 }}>
+                <b style={{ display: 'block', fontSize: 13, marginBottom: 6 }}>2. Select Colors & Attach Variant Photos</b>
+                <div className="variant-chip-group">
+                  {COMMON_COLORS.map(col => {
+                    const isSelected = selectedColors.some(c => c.name === col);
+                    return (
+                      <button type="button" key={col} className={`variant-chip ${isSelected ? 'selected' : ''}`} onClick={() => toggleColor(col)}>
+                        {isSelected ? '✓ ' : '+ '}{col}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="variant-custom-input">
+                  <input placeholder="Add custom color (e.g. Burgundy, Mustard, Rose Gold)" value={customColor} onChange={e => setCustomColor(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomColor(); } }} />
+                  <button type="button" onClick={addCustomColor}>+ Add Color</button>
+                </div>
+
+                {selectedColors.length > 0 && (
+                  <div style={{ marginTop: 10 }}>
+                    <b style={{ display: 'block', fontSize: 12, marginBottom: 6 }}>Color photo attachments:</b>
+                    <p className="muted" style={{ fontSize: 11, margin: '0 0 8px' }}>Customers will see this photo switch automatically when clicking this color.</p>
+                    {selectedColors.map(col => (
+                      <div key={col.name} className="variant-color-row">
+                        <span style={{ fontWeight: 600, minWidth: 90 }}>{col.name}</span>
+                        {col.image ? (
+                          <img src={resolveImageUrl(col.image)} alt={col.name} className="variant-color-thumb" />
+                        ) : (
+                          <div className="variant-color-thumb" style={{ display: 'grid', placeItems: 'center', background: '#f0f3f1', fontSize: 10, color: '#888' }}>No photo</div>
+                        )}
+                        <input style={{ flex: 1, minWidth: 160 }} placeholder="Paste HTTPS image URL or use upload below" value={col.image || ''} onChange={e => updateColorImage(col.name, e.target.value)} />
+                        <UploadField multiple={false} onUploaded={urls => { if (urls[0]) updateColorImage(col.name, urls[0]); }} />
+                        <button type="button" onClick={() => toggleColor(col.name)}>Remove</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'electronics' && (
+            <div style={{ background: '#fff', border: '1px solid #dce4dd', borderRadius: 8, padding: 14, marginBottom: 14 }}>
+              <b style={{ display: 'block', fontSize: 13, marginBottom: 6 }}>1. Storage / Memory</b>
+              <div className="variant-chip-group">
+                {ELECTRONICS_PRESETS['Storage'].map(st => (
+                  <button type="button" key={st} className={`variant-chip ${customOpt1Values.includes(st) ? 'selected' : ''}`} onClick={() => toggleCustomOpt(st)}>
+                    {customOpt1Values.includes(st) ? '✓ ' : '+ '}{st}
+                  </button>
+                ))}
+              </div>
+              <div className="variant-custom-input">
+                <input placeholder="Add custom storage or capacity (e.g. 2TB, 64GB+4GB)" value={customOpt1Input} onChange={e => setCustomOpt1Input(e.target.value)} />
+                <button type="button" onClick={addCustomOptVal}>+ Add</button>
+              </div>
+
+              <div style={{ borderTop: '1px solid #edf2ee', paddingTop: 14, marginTop: 12 }}>
+                <b style={{ display: 'block', fontSize: 13, marginBottom: 6 }}>2. Colors</b>
+                <div className="variant-chip-group">
+                  {['Space Grey', 'Silver', 'Gold', 'Midnight', 'Black', 'White', 'Blue'].map(col => {
+                    const isSelected = selectedColors.some(c => c.name === col);
+                    return (
+                      <button type="button" key={col} className={`variant-chip ${isSelected ? 'selected' : ''}`} onClick={() => toggleColor(col)}>
+                        {isSelected ? '✓ ' : '+ '}{col}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'grocery' && (
+            <div style={{ background: '#fff', border: '1px solid #dce4dd', borderRadius: 8, padding: 14, marginBottom: 14 }}>
+              <b style={{ display: 'block', fontSize: 13, marginBottom: 6 }}>Pack Sizes & Weights</b>
+              <div className="variant-chip-group">
+                {GROCERY_PRESETS['Weight / Volume'].concat(GROCERY_PRESETS['Pack Size']).map(val => (
+                  <button type="button" key={val} className={`variant-chip ${customOpt1Values.includes(val) ? 'selected' : ''}`} onClick={() => toggleCustomOpt(val)}>
+                    {customOpt1Values.includes(val) ? '✓ ' : '+ '}{val}
+                  </button>
+                ))}
+              </div>
+              <div className="variant-custom-input">
+                <input placeholder="Add custom weight or pack (e.g. 100g, Pack of 4)" value={customOpt1Input} onChange={e => setCustomOpt1Input(e.target.value)} />
+                <button type="button" onClick={addCustomOptVal}>+ Add</button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'custom' && (
+            <div style={{ background: '#fff', border: '1px solid #dce4dd', borderRadius: 8, padding: 14, marginBottom: 14 }}>
+              <label>Variation Name (e.g. Flavor, Model, Scent)
+                <input value={customOpt1Name} onChange={e => setCustomOpt1Name(e.target.value)} />
+              </label>
+              <div className="variant-custom-input">
+                <input placeholder="Add value (e.g. Vanilla, Standard Edition)" value={customOpt1Input} onChange={e => setCustomOpt1Input(e.target.value)} />
+                <button type="button" onClick={addCustomOptVal}>+ Add Value</button>
+              </div>
+              <div className="variant-chip-group">
+                {customOpt1Values.map(val => (
+                  <span key={val} className="pill" style={{ margin: '2px 4px', background: '#eaf4eb', color: '#1a5c28' }}>
+                    {val} <button type="button" className="variant-chip-remove" onClick={() => toggleCustomOpt(val)}>×</button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', margin: '14px 0', flexWrap: 'wrap' }}>
+            <button type="button" className="primary" onClick={generateCombinations} style={{ padding: '9px 18px' }}>
+              ⚡ Generate / Update Variant Rows
+            </button>
+            <button type="button" onClick={() => onChange([...value, { name: '', price: bulkPrice || '', stock: bulkStock || '0' }])}>
+              + Add single row manually
+            </button>
+          </div>
+
+          {value.length > 0 && (
+            <div className="variant-bulk-bar">
+              <b>Bulk Actions:</b>
+              <label style={{ margin: 0, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                Price:
+                <input type="number" min="0.01" step="0.01" placeholder="PKR" value={bulkPrice} onChange={e => setBulkPrice(e.target.value)} />
+                <button type="button" onClick={() => applyBulk('price')}>Apply to all</button>
+              </label>
+              <label style={{ margin: 0, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                Stock:
+                <input type="number" min="0" step="1" placeholder="Qty" value={bulkStock} onChange={e => setBulkStock(e.target.value)} />
+                <button type="button" onClick={() => applyBulk('stock')}>Apply to all</button>
+              </label>
+            </div>
+          )}
+
+          {value.length > 0 ? (
+            <div className="variant-table-wrap">
+              <table className="variant-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: 45 }}>Photo</th>
+                    <th>Variant Description (Name)</th>
+                    <th style={{ width: 140 }}>Price (PKR)</th>
+                    <th style={{ width: 100 }}>Stock</th>
+                    <th style={{ width: 80 }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {value.map((variant, index) => (
+                    <tr key={variant.id || index}>
+                      <td>
+                        {variant.image ? (
+                          <img src={resolveImageUrl(variant.image)} alt="" className="variant-color-thumb" />
+                        ) : (
+                          <div className="variant-color-thumb" style={{ display: 'grid', placeItems: 'center', background: '#f5f7f5', fontSize: 9, color: '#aaa' }}>No img</div>
+                        )}
+                      </td>
+                      <td>
+                        <input required maxLength={120} placeholder="e.g. Color: Red / Size: Medium" value={variant.name} onChange={e => updateRow(index, { name: e.target.value })} />
+                      </td>
+                      <td>
+                        <input required type="number" min="0.01" step="0.01" value={variant.price} onChange={e => updateRow(index, { price: e.target.value })} />
+                      </td>
+                      <td>
+                        <input required type="number" min="0" step="1" value={variant.stock} onChange={e => updateRow(index, { stock: e.target.value })} />
+                      </td>
+                      <td>
+                        <button type="button" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => onChange(value.filter((_, i) => i !== index))}>
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="muted" style={{ fontStyle: 'italic', margin: '8px 0' }}>
+              No variant rows generated yet. Select sizes/colors above and click &quot;Generate / Update Variant Rows&quot;, or click &quot;+ Add single row manually&quot;.
+            </p>
+          )}
+        </div>
+      )}
+    </fieldset>
+  );
+}
+
 function ViewSwitch({value,onChange,label}:{value:'grid'|'list';onChange:(value:'grid'|'list')=>void;label:string}){return <div className="view-switch" role="group" aria-label={label+' view'}><button type="button" aria-pressed={value==='grid'} onClick={()=>onChange('grid')}>▦ Grid</button><button type="button" aria-pressed={value==='list'} onClick={()=>onChange('list')}>☷ List</button></div>}
 function slugFromName(name:string,existingSlugs:Set<string>):string{
   const base=name.toLowerCase().trim().replace(/[^a-z0-9-]+/g,'').replace(/-+/g,'-').replace(/^-|-$/g,'').slice(0,180);
@@ -37,7 +487,7 @@ function resolveImageUrl(src?: string | null) {
   if (src.startsWith('/uploads/')) return `https://api.barwaqt.com${src}`;
   return src;
 }
-export function Products({initialOpen=false}:{initialOpen?:boolean}){const [view,setView]=useState<'grid'|'list'>('grid');const [page,setPage]=useState(1);const [search,setSearch]=useState('');const [reviewStatus,setReviewStatus]=useState('');const list=useApi<Product[]>('/vendor/products?limit=20&page='+page+'&search='+encodeURIComponent(search)+(reviewStatus?'&reviewStatus='+reviewStatus:''));const vendorProfile=useApi<VendorProfile>('/vendor/profile');const vendorCategories=useApi<Category[]>('/catalog/categories?ids='+((vendorProfile.data&&vendorProfile.data.categoryIds&&vendorProfile.data.categoryIds.length)?vendorProfile.data.categoryIds.join(','):''));const [draft,setDraft]=useState(emptyProduct);const [editing,setEditing]=useState<string|null>(initialOpen?'':null);const [message,setMessage]=useState('');const [busy,setBusy]=useState(false);const existingSlugs=useMemo(()=>new Set(list.data?.map(p=>p.slug)||[]),[list.data]);function changeName(name:string){setDraft(d=>{const previousAuto=slugFromName(d.name,existingSlugs);const nextAuto=slugFromName(name,existingSlugs);return {...d,name,slug:(!d.slug||d.slug===previousAuto)&&nextAuto?nextAuto:d.slug}})}; const draftImages=draft.images.split('\n').map(s=>s.trim()).filter(Boolean); return <section className="panel"><div className="panel-heading"><h2>Product catalog</h2><ViewSwitch value={view} onChange={setView} label="Products"/><button className="primary" onClick={()=>{setDraft({...emptyProduct,categoryId:vendorCategories.data?.[0]?.id||''});setEditing('');}}>Add product</button></div><p className="muted">New products and listing changes need administrator approval before customers can see them. Stock updates do not require another review.</p><select aria-label="Review status" value={reviewStatus} onChange={e=>{setReviewStatus(e.target.value);setPage(1);}}><option value="">All review statuses</option><option value="PENDING">Pending review</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option></select><input aria-label="Search products" placeholder="Search products" value={search} onChange={e=>{setSearch(e.target.value);setPage(1);}}/><State {...list} retry={list.reload}/><div className={`catalog catalog-${view}`}>{list.data?.map(p=><article key={p.id}>{p.images[0]?<Image src={resolveImageUrl(p.images[0])} alt={p.name} width={180} height={150} unoptimized style={{objectFit:'contain'}}/>:<div className="catalog-image-placeholder">No image</div>}<div className="catalog-info"><h3>{p.name}</h3><p>{vendorCategories.data?.find(c=>c.id===p.categoryId)?.name||'Uncategorized'}</p><p><b>{money(p.priceMinor)}</b> · {p.stock} in stock · {p.reviewStatus==='APPROVED'?(p.active?'Published':'Unpublished'):'Not published'}</p><p className="pill">{p.reviewStatus==='PENDING'?'Pending review':p.reviewStatus==='REJECTED'?'Rejected':'Approved'}</p>{p.rejectionReason&&<p role="note"><b>Reason for rejection:</b> {p.rejectionReason}</p>}</div><div className="catalog-actions"><button onClick={()=>{setDraft({name:p.name,slug:p.slug,categoryId:p.categoryId,description:p.description,price:String(p.priceMinor/100),stock:String(p.stock),images:p.images.join('\n'),attributes:JSON.stringify(p.attributes,null,2),variants:(p.variants||[]).map(v=>({id:v.id,name:v.name,price:String(v.priceMinor/100),stock:String(v.stock)})),expressDelivery:!!p.expressDelivery,expressEtaMinutes:p.expressEtaMinutes||120,standardDeliveryDays:p.standardDeliveryDays||7,active:p.active});setEditing(p.id);}}>Edit</button><button disabled={busy} onClick={async()=>{setBusy(true);try{await api('/vendor/products/'+p.id,'PATCH',{active:!p.active});list.reload();}catch(e){setMessage((e as Error).message);}finally{setBusy(false);}}}>{p.active?'Disable listing':p.reviewStatus==='APPROVED'?'Publish':'Enable after approval'}</button></div></article>)}</div>{!list.loading&&!list.error&&!list.data?.length&&<p>No products. Add your first product.</p>}<div className="live-actions"><button disabled={page===1} onClick={()=>setPage(v=>v-1)}>Previous</button><span>Page {page}</span><button disabled={(list.data?.length||0)<20} onClick={()=>setPage(v=>v+1)}>Next</button></div><p role="status">{message}</p>{editing!==null&&<div className="modal-backdrop"><section className="modal" role="dialog" aria-modal="true" aria-label="Product editor" style={{maxHeight:'90vh',overflow:'auto'}}><button disabled={busy} onClick={()=>setEditing(null)}>Close</button><form onSubmit={async e=>{e.preventDefault();setBusy(true);setMessage('');try{const attributes=JSON.parse(draft.attributes);if(!attributes||Array.isArray(attributes)||typeof attributes!=='object'||Object.values(attributes).some(v=>typeof v!=='string'))throw new Error('Attributes must be a JSON object with string values.');const variants=draft.variants.map(v=>({...(v.id?{id:v.id}:{}),name:v.name.trim(),priceMinor:Math.round(Number(v.price)*100),stock:Number(v.stock)}));const saved=await api<Product>('/vendor/products'+(editing?'/'+editing:''),editing?'PATCH':'POST',{name:draft.name,slug:draft.slug,categoryId:draft.categoryId,description:draft.description,priceMinor:variants.length?Math.min(...variants.map(v=>v.priceMinor)):Math.round(Number(draft.price)*100),stock:variants.length?variants.reduce((sum,v)=>sum+v.stock,0):Number(draft.stock),images:draft.images.split('\n').map(s=>s.trim()).filter(Boolean),attributes,variants,expressDelivery:draft.expressDelivery,expressEtaMinutes:draft.expressEtaMinutes,standardDeliveryDays:draft.standardDeliveryDays,active:draft.active});setEditing(null);list.reload();setMessage(saved.reviewStatus==='PENDING'?'Product submitted for admin review. It will appear to customers after approval.':'Product saved.');}catch(e){setMessage((e as Error).message);}finally{setBusy(false);}}}><h2>{editing?'Edit product':'New product'}</h2>{(['name','slug','price','stock'] as const).map(k=><label key={k}>{k==='price'?'Price (PKR)':k==='slug'?'Slug':k}<input required={k!=='price'&&k!=='stock'||!draft.variants.length} type={k==='price'||k==='stock'?'number':'text'} min={k==='price'?'0.01':'0'} step={k==='price'?'0.01':'1'} value={draft[k]} onChange={e=>{const v=e.target.value;if(k==='name'){changeName(v);}else{setDraft({...draft,[k]:v});}}} onBlur={k==='slug'?e=>{if(!e.target.value.trim())setDraft({...draft,slug:slugFromName(draft.name,existingSlugs)});}:undefined}/>{k==='slug'&&<small className="muted">Auto-generated from product name. Edit to override.</small>}</label>)}<label>Category<select required value={draft.categoryId} onChange={e=>setDraft({...draft,categoryId:e.target.value})}><option value="">Choose category</option>{vendorCategories.data?.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>{vendorCategories.error&&<p role="alert">{vendorCategories.error}</p>}<ProductVariantsField value={draft.variants} onChange={variants=>setDraft({...draft,variants})}/><ProductDeliveryFields value={{expressDelivery:draft.expressDelivery,expressEtaMinutes:draft.expressEtaMinutes,standardDeliveryDays:draft.standardDeliveryDays}} onChange={delivery=>setDraft({...draft,...delivery})}/><label>Description<textarea maxLength={10000} value={draft.description} onChange={e=>setDraft({...draft,description:e.target.value})}/></label><label>Image URLs (one HTTPS URL per line; max 12)<textarea value={draft.images} onChange={e=>setDraft({...draft,images:e.target.value})}/></label><UploadField multiple onUploaded={urls=>setDraft(draft=>{const current=draft.images.split('\n').map(s=>s.trim()).filter(Boolean);const room=Math.max(0,12-current.length);const next=[...current,...urls.slice(0,room).filter(url=>!current.includes(url))];return {...draft,images:next.join('\n')}})}/>{draftImages.length>0&&<div className="image-previews">{draftImages.map(url=><div className="image-preview" key={url}><Image src={resolveImageUrl(url)} alt="" width={72} height={72} unoptimized/><button type="button" aria-label="Remove image" onClick={()=>setDraft(draft=>({...draft,images:draft.images.split('\n').map(s=>s.trim()).filter(Boolean).filter(item=>item!==url).join('\n')}))}>×</button></div>)}</div>}<small>PNG, JPEG or WebP, up to 5 MB each. Select several images at once. Maximum 12 product images.</small><label>Attributes (JSON)<textarea value={draft.attributes} onChange={e=>setDraft({...draft,attributes:e.target.value})}/></label><label><input type="checkbox" checked={draft.active} onChange={e=>setDraft({...draft,active:e.target.checked})}/> Enable publication after approval</label><p role="alert">{message}</p><button className="primary" disabled={busy}>{busy?'Submitting…':'Save and submit for review'}</button></form></section></div>}</section>;
+export function Products({initialOpen=false}:{initialOpen?:boolean}){const [view,setView]=useState<'grid'|'list'>('grid');const [page,setPage]=useState(1);const [search,setSearch]=useState('');const [reviewStatus,setReviewStatus]=useState('');const list=useApi<Product[]>('/vendor/products?limit=20&page='+page+'&search='+encodeURIComponent(search)+(reviewStatus?'&reviewStatus='+reviewStatus:''));const vendorProfile=useApi<VendorProfile>('/vendor/profile');const vendorCategories=useApi<Category[]>('/catalog/categories?ids='+((vendorProfile.data&&vendorProfile.data.categoryIds&&vendorProfile.data.categoryIds.length)?vendorProfile.data.categoryIds.join(','):''));const [draft,setDraft]=useState(emptyProduct);const [editing,setEditing]=useState<string|null>(initialOpen?'':null);const [message,setMessage]=useState('');const [busy,setBusy]=useState(false);const existingSlugs=useMemo(()=>new Set(list.data?.map(p=>p.slug)||[]),[list.data]);function changeName(name:string){setDraft(d=>{const previousAuto=slugFromName(d.name,existingSlugs);const nextAuto=slugFromName(name,existingSlugs);return {...d,name,slug:(!d.slug||d.slug===previousAuto)&&nextAuto?nextAuto:d.slug}})}; const draftImages=draft.images.split('\n').map(s=>s.trim()).filter(Boolean); return <section className="panel"><div className="panel-heading"><h2>Product catalog</h2><ViewSwitch value={view} onChange={setView} label="Products"/><button className="primary" onClick={()=>{setDraft({...emptyProduct,categoryId:vendorCategories.data?.[0]?.id||''});setEditing('');}}>Add product</button></div><p className="muted">New products and listing changes need administrator approval before customers can see them. Stock updates do not require another review.</p><select aria-label="Review status" value={reviewStatus} onChange={e=>{setReviewStatus(e.target.value);setPage(1);}}><option value="">All review statuses</option><option value="PENDING">Pending review</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option></select><input aria-label="Search products" placeholder="Search products" value={search} onChange={e=>{setSearch(e.target.value);setPage(1);}}/><State {...list} retry={list.reload}/><div className={`catalog catalog-${view}`}>{list.data?.map(p=><article key={p.id}>{p.images[0]?<Image src={resolveImageUrl(p.images[0])} alt={p.name} width={180} height={150} unoptimized style={{objectFit:'contain'}}/>:<div className="catalog-image-placeholder">No image</div>}<div className="catalog-info"><h3>{p.name}</h3><p>{vendorCategories.data?.find(c=>c.id===p.categoryId)?.name||'Uncategorized'}</p><p><b>{money(p.priceMinor)}</b> · {p.stock} in stock · {p.reviewStatus==='APPROVED'?(p.active?'Published':'Unpublished'):'Not published'}</p><p className="pill">{p.reviewStatus==='PENDING'?'Pending review':p.reviewStatus==='REJECTED'?'Rejected':'Approved'}</p>{p.rejectionReason&&<p role="note"><b>Reason for rejection:</b> {p.rejectionReason}</p>}</div><div className="catalog-actions"><button onClick={()=>{setDraft({name:p.name,slug:p.slug,categoryId:p.categoryId,description:p.description,price:String(p.priceMinor/100),stock:String(p.stock),images:p.images.join('\n'),attributes:JSON.stringify(p.attributes,null,2),variants:(p.variants||[]).map(v=>({id:v.id,name:v.name,price:String(v.priceMinor/100),stock:String(v.stock),image:v.image||'',options:v.options||{}})),expressDelivery:!!p.expressDelivery,expressEtaMinutes:p.expressEtaMinutes||120,standardDeliveryDays:p.standardDeliveryDays||7,active:p.active});setEditing(p.id);}}>Edit</button><button disabled={busy} onClick={async()=>{setBusy(true);try{await api('/vendor/products/'+p.id,'PATCH',{active:!p.active});list.reload();}catch(e){setMessage((e as Error).message);}finally{setBusy(false);}}}>{p.active?'Disable listing':p.reviewStatus==='APPROVED'?'Publish':'Enable after approval'}</button></div></article>)}</div>{!list.loading&&!list.error&&!list.data?.length&&<p>No products. Add your first product.</p>}<div className="live-actions"><button disabled={page===1} onClick={()=>setPage(v=>v-1)}>Previous</button><span>Page {page}</span><button disabled={(list.data?.length||0)<20} onClick={()=>setPage(v=>v+1)}>Next</button></div><p role="status">{message}</p>{editing!==null&&<div className="modal-backdrop"><section className="modal" role="dialog" aria-modal="true" aria-label="Product editor" style={{maxHeight:'90vh',overflow:'auto'}}><button disabled={busy} onClick={()=>setEditing(null)}>Close</button><form onSubmit={async e=>{e.preventDefault();setBusy(true);setMessage('');try{const attributes=JSON.parse(draft.attributes);if(!attributes||Array.isArray(attributes)||typeof attributes!=='object'||Object.values(attributes).some(v=>typeof v!=='string'))throw new Error('Attributes must be a JSON object with string values.');const variants=draft.variants.map(v=>({...(v.id?{id:v.id}:{}),name:v.name.trim(),priceMinor:Math.round(Number(v.price)*100),stock:Number(v.stock),image:v.image?v.image.trim():null,options:v.options||{}}));const saved=await api<Product>('/vendor/products'+(editing?'/'+editing:''),editing?'PATCH':'POST',{name:draft.name,slug:draft.slug,categoryId:draft.categoryId,description:draft.description,priceMinor:variants.length?Math.min(...variants.map(v=>v.priceMinor)):Math.round(Number(draft.price)*100),stock:variants.length?variants.reduce((sum,v)=>sum+v.stock,0):Number(draft.stock),images:draft.images.split('\n').map(s=>s.trim()).filter(Boolean),attributes,variants,expressDelivery:draft.expressDelivery,expressEtaMinutes:draft.expressEtaMinutes,standardDeliveryDays:draft.standardDeliveryDays,active:draft.active});setEditing(null);list.reload();setMessage(saved.reviewStatus==='PENDING'?'Product submitted for admin review. It will appear to customers after approval.':'Product saved.');}catch(e){setMessage((e as Error).message);}finally{setBusy(false);}}}><h2>{editing?'Edit product':'New product'}</h2><label>Product Name<input required maxLength={120} value={draft.name} onChange={e=>changeName(e.target.value)} placeholder="e.g. Men's Casual Cotton Shirt" /></label><label>Slug<input required maxLength={180} value={draft.slug} onChange={e=>setDraft({...draft,slug:e.target.value})} onBlur={e=>{if(!e.target.value.trim())setDraft({...draft,slug:slugFromName(draft.name,existingSlugs)});}} /><small className="muted">Auto-generated from product name. Edit to override.</small></label><label>Category<select required value={draft.categoryId} onChange={e=>setDraft({...draft,categoryId:e.target.value})}><option value="">Choose category</option>{vendorCategories.data?.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>{vendorCategories.error&&<p role="alert">{vendorCategories.error}</p>}{draft.variants.length===0?(<div className="form-grid"><label>Price (PKR)<input required type="number" min="0.01" step="0.01" value={draft.price} onChange={e=>setDraft({...draft,price:e.target.value})} placeholder="Single product price" /></label><label>Stock<input required type="number" min="0" step="1" value={draft.stock} onChange={e=>setDraft({...draft,stock:e.target.value})} placeholder="Inventory count" /></label></div>):(<div style={{background:'#eef7ef',border:'1px solid #cce5cf',borderRadius:8,padding:'10px 14px',margin:'12px 0'}}><b style={{color:'#1e5e2e'}}>Product Price &amp; Stock:</b> <span className="muted">Auto-calculated from your {draft.variants.length} variant(s). Starting price: PKR {Math.min(...draft.variants.map(v=>Number(v.price)||0)).toFixed(2)} · Total stock: {draft.variants.reduce((s,v)=>s+(Number(v.stock)||0),0)}</span></div>)}<ProductVariantsField value={draft.variants} onChange={variants=>setDraft({...draft,variants})}/><ProductDeliveryFields value={{expressDelivery:draft.expressDelivery,expressEtaMinutes:draft.expressEtaMinutes,standardDeliveryDays:draft.standardDeliveryDays}} onChange={delivery=>setDraft({...draft,...delivery})}/><label>Description<textarea maxLength={10000} value={draft.description} onChange={e=>setDraft({...draft,description:e.target.value})}/></label><label>Image URLs (one HTTPS URL per line; max 12)<textarea value={draft.images} onChange={e=>setDraft({...draft,images:e.target.value})}/></label><UploadField multiple onUploaded={urls=>setDraft(draft=>{const current=draft.images.split('\n').map(s=>s.trim()).filter(Boolean);const room=Math.max(0,12-current.length);const next=[...current,...urls.slice(0,room).filter(url=>!current.includes(url))];return {...draft,images:next.join('\n')}})}/>{draftImages.length>0&&<div className="image-previews">{draftImages.map(url=><div className="image-preview" key={url}><Image src={resolveImageUrl(url)} alt="" width={72} height={72} unoptimized/><button type="button" aria-label="Remove image" onClick={()=>setDraft(draft=>({...draft,images:draft.images.split('\n').map(s=>s.trim()).filter(Boolean).filter(item=>item!==url).join('\n')}))}>×</button></div>)}</div>}<small>PNG, JPEG or WebP, up to 5 MB each. Select several images at once. Maximum 12 product images.</small><label>Attributes (JSON)<textarea value={draft.attributes} onChange={e=>setDraft({...draft,attributes:e.target.value})}/></label><label><input type="checkbox" checked={draft.active} onChange={e=>setDraft({...draft,active:e.target.checked})}/> Enable publication after approval</label><p role="alert">{message}</p><button className="primary" disabled={busy}>{busy?'Submitting…':'Save and submit for review'}</button></form></section></div>}</section>;
 }
 export function Orders(){const [page,setPage]=useState(1);const [status,setStatus]=useState('');const [section,setSection]=useState('');const list=useApi<VendorOrder[]>('/orders?limit=20&page='+page+(status?'&status='+status:'')+(section?'&section='+section:''));const [busy,setBusy]=useState(false);const [message,setMessage]=useState('');async function act(id:string,action:string){let reason:string|undefined;if(action==='reject'){reason=prompt('Reason for rejection (at least 3 characters)')||undefined;if(!reason)return;}setBusy(true);try{await api('/orders/'+id+'/actions','POST',{action,...(reason?{reason}:{})});list.reload();}catch(e){setMessage((e as Error).message);}finally{setBusy(false);}}return <section className="panel"><h2>Orders</h2><select aria-label="Order section" value={section} onChange={e=>{setSection(e.target.value);setPage(1);}}><option value="">All orders</option><option value="regular">Regular</option><option value="wspan">WSPAN (repeat cancellations)</option></select><select aria-label="Order status" value={status} onChange={e=>{setStatus(e.target.value);setPage(1);}}><option value="">All statuses</option>{['NEW','PREPARING','READY','ASSIGNED','PICKED_UP','DELIVERED','FAILED','CANCELLED','RETURNED'].map(v=><option key={v}>{v}</option>)}</select><button onClick={list.reload}>Refresh</button><State {...list} retry={list.reload}/>{list.data?.map(o=><article className="panel" key={o.id}><h3>{o.id}{o.order?.isWspan?' · WSPAN':''}</h3>{o.order?.isWspan&&<p><b>WSPAN order</b> — this customer has cancelled {o.order?.cancelledShipments||0} previous shipments. Verify before accepting.</p>}<p>{o.status} · {money(o.totalMinor)} · {new Date(o.createdAt).toLocaleString()}</p><p>{o.order?.address.firstName} {o.order?.address.lastName} · {o.order?.address.phone}</p><p>{o.order?.address.street}, {o.order?.address.zone}, {o.order?.address.city}</p>{o.items.map(i=><p key={i.productId}>{i.name}{i.variantName?` (${i.variantName})`:''} × {i.quantity} · {money(i.unitPriceMinor*i.quantity)}</p>)}<div className="live-actions">{o.status==='NEW'&&<><button disabled={busy} onClick={()=>act(o.id,'accept')}>Accept</button><button disabled={busy} onClick={()=>act(o.id,'reject')}>Reject</button></>}{o.status==='PREPARING'&&<button disabled={busy} onClick={()=>act(o.id,'ready')}>Ready for pickup</button>}</div><details><summary>History</summary>{o.events.map((e,i)=><p key={i}>{e.status} · {new Date(e.createdAt).toLocaleString()} {e.note}</p>)}</details></article>)}{!list.loading&&!list.error&&!list.data?.length&&<p>No orders.</p>}<p role="alert">{message}</p><div className="live-actions"><button disabled={page===1} onClick={()=>setPage(v=>v-1)}>Previous</button><span>Page {page}</span><button disabled={(list.data?.length||0)<20} onClick={()=>setPage(v=>v+1)}>Next</button></div></section>;}
 export function Finance(){const list=useApi<SettlementDetail[]>('/vendor/settlements');const [filter,setFilter]=useState('ALL');return <section className="panel finance-page"><div className="panel-heading"><h2>Settlements & payouts</h2><button className="mini-button" onClick={list.reload}>Refresh</button></div><p className="muted">Barwaqt collects customer payments and pays your store after reconciliation. Delivered item sales − discounts − commission + adjustments = vendor payout. Delivery fees are retained by the platform.</p><p className="muted">Pending: created for review. Processed: approved, awaiting transfer. Paid: admin has recorded the completed transfer and reference.</p><State {...list} retry={list.reload}/>{list.data&&<SettlementTotals rows={list.data}/>}<label>Status<select value={filter} onChange={e=>setFilter(e.target.value)}><option value="ALL">All statuses</option><option value="PENDING">Pending review</option><option value="PROCESSED">Awaiting payment</option><option value="PAID">Paid</option></select></label><p className="muted">Latest 100 settlements. Summary totals cover these records only; orders not yet added to a settlement are excluded.</p>{list.data?.filter(s=>filter==='ALL'||s.status===filter).map(s=><article className="settlement-record" key={s.id}><div className="settlement-record-heading"><h3>{money(s.amountMinor)}</h3><span className="pill">{s.status==='PROCESSED'?'Awaiting payment':s.status}</span></div><p>Payment reference: {s.reference||'Not recorded yet'}</p><SettlementBreakdown settlement={s}/></article>)}{!list.loading&&!list.error&&!list.data?.some(s=>filter==='ALL'||s.status===filter)&&<div className="empty"><h3>No matching settlements</h3><p>Delivered orders become eligible once Barwaqt receives payment. Open returns may hold an order. Admin creates and pays settlements.</p></div>}</section>;}
