@@ -46,7 +46,10 @@ const GROCERY_PRESETS: Record<string, string[]> = {
 function ProductDeliveryFields({value,onChange}:{value:{expressDelivery:boolean;expressEtaMinutes:number;standardDeliveryDays:number};onChange:(next:{expressDelivery:boolean;expressEtaMinutes:number;standardDeliveryDays:number})=>void}){return <fieldset><legend>Delivery options</legend><div className="form-grid"><label>Standard delivery<select value={value.standardDeliveryDays} onChange={e=>onChange({...value,standardDeliveryDays:Number(e.target.value)})}>{[1,2,3,4,5,6,7].map(days=><option key={days} value={days}>Within {days} day{days===1?'':'s'}</option>)}</select></label><label>Express delivery<select value={value.expressDelivery?'on':'off'} onChange={e=>onChange({...value,expressDelivery:e.target.value==='on'})}><option value="off">Not offered</option><option value="on">Offered</option></select></label>{value.expressDelivery&&<label>Express delivery time<select value={value.expressEtaMinutes} onChange={e=>onChange({...value,expressEtaMinutes:Number(e.target.value)})}>{expressWindows.map(([minutes,label])=><option key={minutes} value={minutes}>Within {label}</option>)}</select></label>}</div><p className="muted" style={{marginTop:6}}>Customers pick one option at checkout for this product. Express is only offered when every product in the basket supports it.</p></fieldset>}
 
 function ProductVariantsField({value,onChange}:{value:VariantDraft[];onChange:(next:VariantDraft[])=>void}){
-  const [hasVariants, setHasVariants] = useState(value.length > 0);
+  const [variantsMode, setVariantsMode] = useState(false);
+  // A loaded product with variants opens in variations mode; clearing the
+  // variants switches back to a simple product without keeping stale state.
+  const hasVariants = variantsMode || value.length > 0;
   const [activeTab, setActiveTab] = useState<'apparel'|'electronics'|'grocery'|'custom'>('apparel');
   const [sizeCategory, setSizeCategory] = useState<string>('Adult Apparel (Shirts, Tops, Dresses)');
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
@@ -58,11 +61,6 @@ function ProductVariantsField({value,onChange}:{value:VariantDraft[];onChange:(n
   const [customOpt1Input, setCustomOpt1Input] = useState('');
   const [bulkPrice, setBulkPrice] = useState('');
   const [bulkStock, setBulkStock] = useState('');
-
-  // Keep hasVariants in sync if external value loads with variants
-  useEffect(() => {
-    if (value.length > 0 && !hasVariants) setHasVariants(true);
-  }, [value.length]);
 
   function updateRow(index:number, patch:Partial<VariantDraft>){
     onChange(value.map((v, i) => i === index ? { ...v, ...patch } : v));
@@ -225,11 +223,11 @@ function ProductVariantsField({value,onChange}:{value:VariantDraft[];onChange:(n
       <legend><b>Product variations & options</b></legend>
       <div className="variant-mode-selector">
         <label>
-          <input type="radio" name="prod-variation-mode" checked={!hasVariants} onChange={() => { setHasVariants(false); onChange([]); }} />
+          <input type="radio" name="prod-variation-mode" checked={!hasVariants} onChange={() => { setVariantsMode(false); onChange([]); }} />
           <span><b>Simple product</b> (Single price & stock, no variations like books or standard appliances)</span>
         </label>
         <label>
-          <input type="radio" name="prod-variation-mode" checked={hasVariants} onChange={() => setHasVariants(true)} />
+          <input type="radio" name="prod-variation-mode" checked={hasVariants} onChange={() => setVariantsMode(true)} />
           <span><b>Product with variations</b> (Sizes, Colors, Models, Storage)</span>
         </label>
       </div>
