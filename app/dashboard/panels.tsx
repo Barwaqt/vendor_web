@@ -26,6 +26,7 @@ const SIZE_PRESETS: Record<string, string[]> = {
   'Pants & Waist (Inches)': ['28', '30', '32', '34', '36', '38', '40', '42'],
   'Footwear (EU Sizes)': ['36', '37', '38', '39', '40', '41', '42', '43', '44', '45'],
   'One Size / Free Size': ['Free Size', 'One Size'],
+  'Fragrance / Perfume (ml)': ['50 ml', '75 ml', '100 ml', '150 ml', '200 ml'],
 };
 
 const COMMON_COLORS = [
@@ -288,7 +289,7 @@ function ProductVariantsField({value,onChange}:{value:VariantDraft[];onChange:(n
                 </div>
 
                 <div className="variant-custom-input">
-                  <input placeholder="Add custom size (e.g. 0 to 5 months, 5-6 Years, Tailored)" value={customSize} onChange={e => setCustomSize(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomSize(); } }} />
+                  <input placeholder="Add custom size (e.g. 30 ml, 0 to 5 months, Tailored)" value={customSize} onChange={e => setCustomSize(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomSize(); } }} />
                   <button type="button" onClick={addCustomSize}>+ Add Size</button>
                 </div>
 
